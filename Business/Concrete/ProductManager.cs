@@ -23,64 +23,90 @@ namespace Business.Concrete
     public class ProductManager : IProductService
     {
         IProductDal _productDal;
-        //Bir EntityManager kendisi hariç başka bir entityDal'ı enjekte edemez. Bunun yerine başka bir EntityService'i enjekte edebiliriz.
-        ICategoryService _categoryService;  
+        ICategoryService _categoryService;
 
-        public ProductManager(IProductDal productDal,ICategoryService categoryService)
+        public ProductManager(IProductDal productDal, ICategoryService categoryService)
         {
             _productDal = productDal;
             _categoryService = categoryService;
         }
-        [SecuredOperation("product.add,admin")] //add işlemi yapmak için product.add veya admin yetkisine ihtiyaç var.
+
+        //Claim
+        //[SecuredOperation("product.add,admin")]
         [ValidationAspect(typeof(ProductValidator))]
+        [CacheRemoveAspect("IProductService.Get")]
         public IResult Add(Product product)
         {
-            //iş kuralları 
-            IResult result =BusinessRules.Run(CheckIfProductNameExist(product.ProductName),
-                CheckIfProductCountOfCategoryCorrect(product.CategoryId));
-            //result: yukarıdaki kurala uymayan.
+
+            //Aynı isimde ürün eklenemez
+            //Eğer mevcut kategori sayısı 15'i geçtiyse sisteme yeni ürün eklenemez. ve 
+            IResult result = BusinessRules.Run(CheckIfProductNameExists(product.ProductName),
+                CheckIfProductCountOfCategoryCorrect(product.CategoryId), CheckIfCategoryLimitExceded());
+
             if (result != null)
             {
-                return result; //kurala uymayan bir durum oluşmuşsa
+                return result;
             }
+
             _productDal.Add(product);
 
             return new SuccessResult(Messages.ProductAdded);
-            
+
         }
-        [CacheAspect]
+
+
+        [CacheAspect] //key,value
         public IDataResult<List<Product>> GetAll()
         {
-            //iş kodları
-            if (DateTime.Now.Hour == 5)
+            if (DateTime.Now.Hour == 1)
             {
                 return new ErrorDataResult<List<Product>>(Messages.MaintenanceTime);
             }
-            return new SuccessDataResult<List<Product>>(_productDal.GetAll(),Messages.ProductsListed);
+
+            return new SuccessDataResult<List<Product>>(_productDal.GetAll(), Messages.ProductsListed);
         }
 
         public IDataResult<List<Product>> GetAllByCategoryId(int id)
         {
-            return new SuccessDataResult<List<Product>>(_productDal.GetAll(p=>p.CategoryId==id));
+            return new SuccessDataResult<List<Product>>(_productDal.GetAll(p => p.CategoryId == id));
         }
 
         [CacheAspect]
+        //[PerformanceAspect(5)]
         public IDataResult<Product> GetById(int productId)
         {
-            return new SuccessDataResult<Product>(_productDal.Get(p => p.ProductId==productId));
+            return new SuccessDataResult<Product>(_productDal.Get(p => p.ProductId == productId));
         }
 
         public IDataResult<List<Product>> GetByUnitPrice(decimal min, decimal max)
         {
-            return new SuccessDataResult<List<Product>>(_productDal.GetAll(p=>p.UnitPrice>=min && p.UnitPrice<=max));
+            return new SuccessDataResult<List<Product>>(_productDal.GetAll(p => p.UnitPrice >= min && p.UnitPrice <= max));
         }
 
         public IDataResult<List<ProductDetailDto>> GetProductDetails()
         {
+            if (DateTime.Now.Hour == 23)
+            {
+                return new ErrorDataResult<List<ProductDetailDto>>(Messages.MaintenanceTime);
+            }
             return new SuccessDataResult<List<ProductDetailDto>>(_productDal.GetProductDetails());
         }
+
+        [ValidationAspect(typeof(ProductValidator))]
+        [CacheRemoveAspect("IProductService.Get")]
+        public IResult Update(Product product)
+        {
+            var result = _productDal.GetAll(p => p.CategoryId == product.CategoryId).Count;
+            if (result >= 10)
+            {
+                return new ErrorResult(Messages.ProductCountOfCategoryError);
+            }
+            throw new NotImplementedException();
+        }
+
         private IResult CheckIfProductCountOfCategoryCorrect(int categoryId)
         {
+            //Select count(*) from products where categoryId=1
             var result = _productDal.GetAll(p => p.CategoryId == categoryId).Count;
             if (result >= 15)
             {
@@ -88,14 +114,42 @@ namespace Business.Concrete
             }
             return new SuccessResult();
         }
-        private IResult CheckIfProductNameExist(string productName)
+
+        private IResult CheckIfProductNameExists(string productName)
         {
-            var result = _productDal.GetAll(p => p.ProductName == productName).Any(); //any var mı demek.
+            var result = _productDal.GetAll(p => p.ProductName == productName).Any();
             if (result)
             {
-                return new ErrorResult(Messages.ProductNameAlreadyExist);
+                return new ErrorResult("Bu isimde başka bir ürün var.");
             }
             return new SuccessResult();
-        }       
+        }
+
+        private IResult CheckIfCategoryLimitExceded()
+        {
+            var result = _categoryService.GetAll();
+            if (result.Data.Count > 15)
+            {
+                return new ErrorResult(Messages.CategoryLimitExceded);
+            }
+
+            return new SuccessResult();
+        }
+
+        //[TransactionScopeAspect]
+        public IResult AddTransactionalTest(Product product)
+        {
+
+            Add(product);
+            if (product.UnitPrice < 10)
+            {
+                throw new Exception("");
+            }
+
+            Add(product);
+
+            return null;
+        }
+
     }
 }

@@ -41,8 +41,9 @@ namespace WebAPI
             services.AddControllers();
             //services.AddSingleton<IProductService, ProductManager>();//içinde data tutmuyorsak singleton.//Biri constructordaIProductService isterse arka planda ProductManager ver
             //services.AddSingleton<IProductDal, EfProductDal>(); //ProductManager da bir IProductDal'a bağlı old için bu satır gerekli.
-            
 
+            services.AddCors();
+            
             var tokenOptions = Configuration.GetSection("TokenOptions").Get<TokenOptions>();
 
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -71,6 +72,10 @@ namespace WebAPI
             {
                 app.UseDeveloperExceptionPage();
             }
+
+            app.ConfigureCustomExceptionMiddleware(); //bütün sistem try-catch içine alındı.
+
+            app.UseCors(builder=>builder.WithOrigins("http://localhost:4200").AllowAnyHeader());//bu adresten gelen herhangi bir isteğe izin ver.
 
             app.UseHttpsRedirection();
 
