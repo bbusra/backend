@@ -17,7 +17,7 @@ namespace Business.ValidationRules.FluentValidation
             RuleFor(p => p.UnitPrice).NotEmpty();
             RuleFor(p => p.UnitPrice).GreaterThan(0);
             RuleFor(p => p.UnitPrice).GreaterThanOrEqualTo(10).When(p => p.CategoryId == 1); //örn tckn sadece tc vatandaşıysa zorunludur gibi bi alan yaratabiliriz.
-            RuleFor(p => p.ProductName).Must(StartWithA).WithMessage("ürünler a harfi ile başlamalı.");//bu methodu ben yazacağım.
+            //RuleFor(p => p.ProductName).Must(StartWithA).WithMessage("ürünler a harfi ile başlamalı.");//bu methodu ben yazacağım.
         }
 
         public bool StartWithA(string arg)

@@ -79,6 +79,13 @@ namespace WebAPI
 
             app.UseHttpsRedirection();
 
+            //app.UseStaticFiles();
+
+            //app.UseStaticFiles(new StaticFileOptions()
+            //{
+            //    FileProvider = new PhysicalFileProvider(Path)
+            //});
+
             app.UseRouting();
 
             app.UseAuthentication();
